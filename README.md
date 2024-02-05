@@ -2,4 +2,4 @@ Please create an environment first.
 
 Then ensure that you are in the same directory with your environment.
 
-Finally write to the console: **pip install django djangorestframework**
+Finally write to the console: **pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru**

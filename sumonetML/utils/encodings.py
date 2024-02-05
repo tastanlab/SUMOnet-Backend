@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from SUMOnet.sumonet.utils.data_pipe import Data
+from sumonetML.utils.data_pipe import Data
 from typing import List
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
