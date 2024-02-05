@@ -1,8 +1,10 @@
 from rest_framework import serializers
-from .models import SUMO
 
-class SUMOSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SUMO
-        fields = ['id', 'protein_id', 'peptide_sequence', 'lysine_position', 'nonsumoylation_class_probs', 'sumoylation_class_probs', 'predicted_labels']
-        
+class UniprotSerializer(serializers.Serializer):
+    uniprot_id = serializers.CharField(max_length=100)
+    lysine_position = serializers.CharField(required=False ,max_length=100)
+    
+    
+class ProteinSequenceSerializer(serializers.Serializer):
+    protein_seq = serializers.ListField(child=serializers.CharField(max_length=1000))
+    

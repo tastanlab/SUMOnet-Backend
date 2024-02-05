@@ -16,9 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from .views import hello
+from .views import uniprotPrediction, proteinSequence
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('hello/', hello)
+    path('uniprot-prediction/', uniprotPrediction),
+    path('protein-sequence-prediction/', proteinSequence)
 ]
