@@ -86,9 +86,19 @@ def uniprotPrediction(request):
 
         df = make_prediction(protein_ids, protein_seqs, k_positions)
             
-        df = df.head()
+        result = [
+                {
+                    "protein_id": uniprot_id,
+                    "peptide_seq": protein_seq,
+                    "lysine_position": lysine_position,
+                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                    "sumoylation_class_probs": sumoylation_class_probs,
+                    "predicted_labels": predicted_labels
+                }
+                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+            ]
             
-        return Response(df.to_dict(), status=status.HTTP_200_OK)
+        return Response(result, status=status.HTTP_200_OK)
             
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
@@ -108,9 +118,12 @@ def proteinSequence(request):
         uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
         
         for i in range(len(protein_seq)):
-            
-            if validateProteinSequence(protein_seq[i]) == False:
+            #! Validate protein sequence
+            #TODO Burayi yarim biraktim devam etmem lazim.
+            ''' 
+            if validateProteinSequence(protein_seq[i], alphabet='protein') == False:
                 return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+            '''
             
             protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_seq[i].split())
         
@@ -136,11 +149,9 @@ def proteinSequence(request):
             
             jsonList.append(result_list)
 
-        # Convert the list to JSON without escaping
-        #json_result = json.dumps(result_list, indent=2)
-        
+
         return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
-        
+
