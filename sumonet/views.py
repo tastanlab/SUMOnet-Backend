@@ -1,11 +1,12 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from sumonetML.model.architecture import SUMOnet
 from sumonetML.utils.encodings import Encoding
 from sumonetML.utils.data_pipe import Data
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, parser_classes
 from sumonet.serializers import UniprotSerializer, ProteinSequenceSerializer
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser
 import re
 import json
 import pandas as pd
@@ -155,3 +156,31 @@ def proteinSequence(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
 
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+def fastaFile(request):
+    file_obj = request.FILES.get('file')
+
+    if file_obj:
+        file_name, file_extension = file_obj.name.split('.')
+
+        if str(file_extension.lower()) != 'fasta':
+            return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        records = file_obj.read().decode('utf-8')
+
+        # You can use a custom filename, or keep the original filename
+        custom_filename = f'{file_name}.fasta'
+        
+        content_disposition = f'attachment; filename={custom_filename}'
+
+        response = Response({'fasta': records}, status=status.HTTP_200_OK)
+        response['Content-Disposition'] = content_disposition
+        
+        
+        
+        
+        
+
+        return response
+    
