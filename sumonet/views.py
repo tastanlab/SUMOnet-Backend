@@ -103,7 +103,7 @@ def uniprotPrediction(request):
             
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        
+ 
 @api_view(['POST'])
 def proteinSequence(request):
     serializer = ProteinSequenceSerializer(data=request.data)
@@ -154,7 +154,7 @@ def proteinSequence(request):
         return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- 
+
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
