@@ -49,18 +49,76 @@ def make_prediction(protein_ids, protein_seqs, k_positions):
     df = prediction_outputs(protein_ids, protein_seqs, k_positions, predicted_probs)
     return df
     
-
-
 def validateProteinSequence(seq, alphabet='protein'):
     
-    alphabets = {'protein': re.compile('^[acdefghiklmnpqrstvwy]*$', re.I)}
+    #alphabets = {'protein': re.compile('^[acdefghiklmnpqrstvwy]*$', re.I)}
 
-
-    if alphabets[alphabet].search(seq) is not None:
+                
+    if seq[0:3] == ">sp": #alphabets[alphabet].search(seq) is not None:
          return True
     else:
          return False
 
+def parse_sequence(seq):
+    return ">" + seq.strip()  # Strip any leading/trailing whitespace
+
+def parse_fasta_to_protein_seq(fasta):
+    
+    # Remove all '\n' and '\r' characters from the fasta content
+    fasta_content_cleaned = fasta.replace('\n', '').replace('\r', '')
+ 
+  
+    # Regular expression pattern
+    SV_pattern = r"(SV=\d+)" #birden fazla space olma durumu handle edilebilir.
+
+    # Find all occurrences of the pattern
+    for match in re.finditer(SV_pattern, fasta_content_cleaned):
+        match_str = match.group(0)
+        # Check if the match is followed by a space
+        if match.end() < len(fasta_content_cleaned) and fasta_content_cleaned[match.end()] != ' ':
+            # If not, add a space after the match
+            fasta_content_cleaned = fasta_content_cleaned[:match.end()] + ' ' + fasta_content_cleaned[match.end():]
+        #print("Already spaced:", fasta_content_cleaned)
+
+    # Split the content based on ">"
+    sequences = fasta_content_cleaned.split(">")[1:]
+    
+    # Store each sequence in a list
+    parsed_sequences = []
+    
+    # Parse each sequence and store in the list
+    for seq in sequences:
+        parsed_sequences.append(parse_sequence(seq))
+    
+    # Return the result as a dictionary
+    #print(parsed_sequences)
+    return {"protein_seq": parsed_sequences}
+
+def parse_protein_sequence(protein_sequence):
+    
+    #print(json_object)
+    
+    # Remove all '\n' and '\r' characters from the fasta content
+    protein_sequence_cleaned = protein_sequence.replace('\n', '').replace('\r', '')
+ 
+  
+    # Regular expression pattern
+    SV_pattern = r"(SV=\d+)" #birden fazla space olma durumu handle edilebilir.
+
+    # Find the first occurrence of the pattern
+    match = re.search(SV_pattern, protein_sequence_cleaned)
+
+    if match:
+        # Check if the match is followed by a space
+        if match.end() < len(protein_sequence_cleaned) and protein_sequence_cleaned[match.end()] != ' ':
+            # If not, add a space after the match
+            modified_string = protein_sequence_cleaned[:match.end()] + ' ' + protein_sequence_cleaned[match.end():]
+        else:
+            modified_string = protein_sequence_cleaned
+    else:
+        modified_string = protein_sequence_cleaned
+
+    return modified_string
 
 @api_view(['POST'])
 def uniprotPrediction(request):
@@ -106,25 +164,105 @@ def uniprotPrediction(request):
         
 @api_view(['POST'])
 def proteinSequence(request):
+    #print("REQUEST:",request.data)
     serializer = ProteinSequenceSerializer(data=request.data)
     
     if serializer.is_valid():
         data_processes = Data()
         protein_seq = serializer.data['protein_seq']
+        protein_seq_len = len(protein_seq)
+        #print(protein_seq)
         
         if protein_seq == '' or protein_seq == None or protein_seq == []:
             return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif protein_seq_len > 5:
+            return Response({'error': 'You can enter up to five proteins. For entries with more than five proteins, use the FASTA file option.'}, status=status.HTTP_400_BAD_REQUEST)
         
         jsonList = []
         uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
         
+        
         for i in range(len(protein_seq)):
             #! Validate protein sequence
             #TODO Burayi yarim biraktim devam etmem lazim.
-            ''' 
+            
             if validateProteinSequence(protein_seq[i], alphabet='protein') == False:
                 return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
-            '''
+            
+            protein_sequence = parse_protein_sequence(protein_seq[i])
+            
+            protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_sequence.split())
+            df = make_prediction(protein_ids, protein_seqs, k_positions)
+        
+            match = uniprotId_pattern.search(protein_sequence)
+
+            # Extract the UniProt ID from the match
+            if match:
+                uniprot_id = match.group(1)
+        
+            result_list = [
+                {
+                    "protein_id": uniprot_id,
+                    "peptide_seq": protein_seq,
+                    "lysine_position": lysine_position,
+                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                    "sumoylation_class_probs": sumoylation_class_probs,
+                    "predicted_labels": predicted_labels
+                }
+                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+            ]
+            
+            jsonList.append(result_list)
+
+
+        return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+@api_view(['POST'])
+#@parser_classes([MultiPartParser])
+def fastaFile(request):
+    file_obj = request.FILES.get('file')
+
+    if file_obj:
+        file_name, file_extension = file_obj.name.split('.')
+
+        if str(file_extension.lower()) != 'fasta':
+            return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        records = file_obj.read().decode('utf-8')
+
+        # You can use a custom filename, or keep the original filename
+        custom_filename = f'{file_name}.fasta'
+        
+        content_disposition = f'attachment; filename={custom_filename}'
+
+        response = Response({'fasta': records}, status=status.HTTP_200_OK)
+        response['Content-Disposition'] = content_disposition
+        # Parse fasta content to protein sequences
+        result = parse_fasta_to_protein_seq(records)
+
+        serializer = ProteinSequenceSerializer(data=result) #Verinin parse edilmiş kısmı direkt sokuluyor.
+    
+    if serializer.is_valid():
+        data_processes = Data()
+        protein_seq = serializer.data['protein_seq']
+        protein_seq_len = len(protein_seq)
+        #print(protein_seq)
+        
+        if protein_seq == '' or protein_seq == None or protein_seq == []:
+            return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+        
+        jsonList = []
+        uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
+        
+        
+        for i in range(len(protein_seq)):
+            #! Validate protein sequence
+            if validateProteinSequence(protein_seq[i], alphabet='protein') == False: # it simply checks the >sp part.
+                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+            
             
             protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_seq[i].split())
         
@@ -155,32 +293,5 @@ def proteinSequence(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
-
-@api_view(['POST'])
-@parser_classes([MultiPartParser])
-def fastaFile(request):
-    file_obj = request.FILES.get('file')
-
-    if file_obj:
-        file_name, file_extension = file_obj.name.split('.')
-
-        if str(file_extension.lower()) != 'fasta':
-            return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        records = file_obj.read().decode('utf-8')
-
-        # You can use a custom filename, or keep the original filename
-        custom_filename = f'{file_name}.fasta'
-        
-        content_disposition = f'attachment; filename={custom_filename}'
-
-        response = Response({'fasta': records}, status=status.HTTP_200_OK)
-        response['Content-Disposition'] = content_disposition
-        
-        
-        
-        
-        
-
-        return response
     
