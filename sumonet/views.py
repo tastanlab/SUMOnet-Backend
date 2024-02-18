@@ -219,80 +219,82 @@ def proteinSequence(request):
  
 
 @api_view(['POST'])
-#@parser_classes([MultiPartParser])
+@parser_classes([MultiPartParser])
 def fastaFile(request):
     file_obj = request.FILES.get('file')
-
     if file_obj:
         file_name, file_extension = file_obj.name.split('.')
 
         if str(file_extension.lower()) != 'fasta':
             return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        records = file_obj.read().decode('utf-8')
 
+        print("here")
+        records = file_obj.read().decode('utf-8')
 
         # You can use a custom filename, or keep the original filename
         custom_filename = f'{file_name}.fasta'
-        
         content_disposition = f'attachment; filename={custom_filename}'
 
         response = Response({'fasta': records}, status=status.HTTP_200_OK)
         response['Content-Disposition'] = content_disposition
         # Parse fasta content to protein sequences
+        print("RECORDS: ", records)
         result = parse_fasta_to_protein_seq(records)
-        #print("RECORDS: ", records)
+        # print("RECORDS: ", records)
         print("RESULT", result)
-        serializer = ProteinSequenceSerializer(data=result) #Verinin parse edilmiş kısmı direkt sokuluyor.
-    
-    if serializer.is_valid():
-        data_processes = Data()
-        protein_seq = serializer.data['protein_seq']
-        protein_seq_len = len(protein_seq)
-        #print(protein_seq)
-        
-        if protein_seq == '' or protein_seq == None or protein_seq == []:
-            return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
-    
-        
-        jsonList = []
-        uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
-        
-        
-        for i in range(len(protein_seq)):
-            #! Validate protein sequence
-            if validateProteinSequence(protein_seq[i], alphabet='protein') == False: # it simply checks the >sp part.
-                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            
-            protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_seq[i].split())
-        
-            df = make_prediction(protein_ids, protein_seqs, k_positions)
-        
-            match = uniprotId_pattern.search(protein_seq[i])
+        serializer = ProteinSequenceSerializer(data=result)  # Verinin parse edilmiş kısmı direkt sokuluyor.
 
-            # Extract the UniProt ID from the match
-            if match:
-                uniprot_id = match.group(1)
-        
-            result_list = [
-                {
-                    "protein_id": uniprot_id,
-                    "peptide_seq": protein_seq,
-                    "lysine_position": lysine_position,
-                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                    "sumoylation_class_probs": sumoylation_class_probs,
-                    "predicted_labels": predicted_labels
-                }
-                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
-            ]
-            
-            jsonList.append(result_list)
+        if serializer.is_valid():
+            data_processes = Data()
+            protein_seq = serializer.data['protein_seq']
+            protein_seq_len = len(protein_seq)
+            # print(protein_seq)
 
+            if protein_seq == '' or protein_seq == None or protein_seq == []:
+                return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
+            jsonList = []
+            uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
+
+            for i in range(len(protein_seq)):
+                # ! Validate protein sequence
+                if validateProteinSequence(protein_seq[i], alphabet='protein') == False:  # it simply checks the >sp part.
+                    return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_seq[i].split())
+
+                df = make_prediction(protein_ids, protein_seqs, k_positions)
+
+                match = uniprotId_pattern.search(protein_seq[i])
+
+                # Extract the UniProt ID from the match
+                if match:
+                    uniprot_id = match.group(1)
+
+                result_list = [
+                    {
+                        "protein_id": uniprot_id,
+                        "peptide_seq": protein_seq,
+                        "lysine_position": lysine_position,
+                        "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                        "sumoylation_class_probs": sumoylation_class_probs,
+                        "predicted_labels": predicted_labels
+                    }
+                    for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs,
+                    predicted_labels in
+                    zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'],
+                        df['sumoylation_class_probs'], df['predicted_labels'])
+                ]
+
+                jsonList.append(result_list)
+
+            return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response({"message": "An error occured."}, status=status.HTTP_400_BAD_REQUEST)
+
  
         
     
