@@ -161,7 +161,6 @@ def uniprotPrediction(request):
             
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        
 
 @api_view(['POST'])
 def proteinSequence(request):
@@ -218,6 +217,7 @@ def proteinSequence(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
+
 @api_view(['POST'])
 #@parser_classes([MultiPartParser])
 def fastaFile(request):
