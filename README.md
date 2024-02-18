@@ -10,7 +10,7 @@ Write the following line to the terminal: `python -m venv env`
 
 ### For Unix/macOS users
 
-Write the following line to the console: `python3 -m venv env`
+Write the following line to the terminal: `python3 -m venv env`
 
 ## Activating the virtual environment
 
@@ -22,7 +22,7 @@ Write the following line to the terminal: `python -m venv env`
 
 ### For Unix/macOS users
 
-Write the following line to the console: `source env/bin/activate`
+Write the following line to the terminal: `source env/bin/activate`
 
 ## Installing the dependencies
 
@@ -40,4 +40,4 @@ After you set up the virtual environment and activate it, you have to install th
 - biopython
 - loguru
 
-To install all of the dependencies, write the following line to the console: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru`
+To install all of the dependencies, write the following line to the terminal: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru`
