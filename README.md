@@ -40,4 +40,4 @@ After you set up the virtual environment and activate it, you have to install th
 - biopython
 - loguru
 
-To install all of the dependencies, write the following line to the console: ` **pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru**`
+To install all of the dependencies, write the following line to the console: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru`
