@@ -162,41 +162,41 @@ def uniprotPrediction(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         
+
 @api_view(['POST'])
 def proteinSequence(request):
-    #print("REQUEST:",request.data)
-    serializer = ProteinSequenceSerializer(data=request.data)
+    #print(request.data)
+    protein_seq = request.data.get('protein_seq', '')
+    #print(protein_seq)
+    result = parse_fasta_to_protein_seq(protein_seq) # fonksiyonun adı değismeli
+    print(result)
+
+    serializer = ProteinSequenceSerializer(data=result)
     
     if serializer.is_valid():
-        data_processes = Data()
-        protein_seq = serializer.data['protein_seq']
-        protein_seq_len = len(protein_seq)
-        #print(protein_seq)
+        protein_sequences = serializer.validated_data['protein_seq']
         
-        if protein_seq == '' or protein_seq == None or protein_seq == []:
-            return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
-        elif protein_seq_len > 5:
+
+        if not protein_sequences:
+            return Response({'error': 'No protein sequences provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(protein_sequences) > 5: # burayı update etmek gerek
             return Response({'error': 'You can enter up to five proteins. For entries with more than five proteins, use the FASTA file option.'}, status=status.HTTP_400_BAD_REQUEST)
         
+        data_processes = Data()
         jsonList = []
         uniprotId_pattern = re.compile(r">sp\|([A-Z0-9]+)\|")
         
-        
-        for i in range(len(protein_seq)):
-            #! Validate protein sequence
-            #TODO Burayi yarim biraktim devam etmem lazim.
-            
-            if validateProteinSequence(protein_seq[i], alphabet='protein') == False:
+        for protein_seq in protein_sequences:
+            if not validateProteinSequence(protein_seq, alphabet='protein'):
                 return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
             
-            protein_sequence = parse_protein_sequence(protein_seq[i])
-            
+            protein_sequence = parse_protein_sequence(protein_seq)
             protein_ids, protein_seqs, k_positions = data_processes.protein_sequence_input(protein_sequence.split())
             df = make_prediction(protein_ids, protein_seqs, k_positions)
         
             match = uniprotId_pattern.search(protein_sequence)
 
-            # Extract the UniProt ID from the match
             if match:
                 uniprot_id = match.group(1)
         
@@ -213,7 +213,6 @@ def proteinSequence(request):
             ]
             
             jsonList.append(result_list)
-
 
         return Response(jsonList, content_type='application/json', status=status.HTTP_200_OK)
     
@@ -232,6 +231,7 @@ def fastaFile(request):
         
         records = file_obj.read().decode('utf-8')
 
+
         # You can use a custom filename, or keep the original filename
         custom_filename = f'{file_name}.fasta'
         
@@ -241,7 +241,8 @@ def fastaFile(request):
         response['Content-Disposition'] = content_disposition
         # Parse fasta content to protein sequences
         result = parse_fasta_to_protein_seq(records)
-
+        #print("RECORDS: ", records)
+        print("RESULT", result)
         serializer = ProteinSequenceSerializer(data=result) #Verinin parse edilmiş kısmı direkt sokuluyor.
     
     if serializer.is_valid():
