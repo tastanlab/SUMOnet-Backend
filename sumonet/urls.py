@@ -17,12 +17,17 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from django.conf import settings
-from .views import uniprotPrediction, proteinSequence, fastaFile
+from .views import uniprotPrediction, proteinSequence, fastaFile, denemeProteinSeq, denemeFastaFile
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('uniprot-prediction/', uniprotPrediction),
     path('protein-sequence-prediction/', proteinSequence),
     path('fasta-file-prediction/', fastaFile),
+    path('denemeProteinSeq/', denemeProteinSeq),
+    path('denemeFastaFile/', denemeFastaFile),
+    
+    
+    
 ]
 

@@ -9,7 +9,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
 import re
 import json
+from io import StringIO
 import pandas as pd
+from Bio import SeqIO
 
 #* The create_dataframe function creates a pandas DataFrame from the protein_id, protein_seq, k_position, predicted_probs, and predicted_labels.
 def create_dataframe(protein_id, protein_seq, k_position, predicted_probs, predicted_labels):
@@ -42,6 +44,8 @@ def make_prediction(protein_ids, protein_seqs, k_positions):
     encoder = Encoding()
     
     X_train = encoder.encode_data(protein_seqs)
+    
+    
     
     my_model = load_models()
    
@@ -296,5 +300,90 @@ def fastaFile(request):
         return Response({"message": "An error occured."}, status=status.HTTP_400_BAD_REQUEST)
 
  
-        
+
+def seqIOParser(record):
+    data_processes = Data()
+    protein_ids, protein_seqs, k_positions = [], [], []
     
+     
+    mers, k_position = data_processes.find_mers_with_K(str(record.seq))
+        
+    protein_seqs += mers
+    k_positions += k_position
+    protein_ids += [record.id] * len(mers)
+        
+    return protein_ids, protein_seqs, k_positions    
+        
+        
+        
+@api_view(['POST'])
+def denemeProteinSeq(request):
+    protein_seq = request.data.get('protein_seq', '')
+
+    
+    fasta_file = StringIO(protein_seq)
+
+    data_processes = Data()
+    jsonList = []
+    idS, seqS, positionS = [], [], []
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        protein_ids, protein_seqs, k_positions = seqIOParser(record)
+        idS.extend(protein_ids)
+        seqS.extend(protein_seqs)
+        positionS.extend(k_positions)
+        
+          
+        
+    print(idS)
+    df = make_prediction(idS, seqS, positionS)  
+    result_list = [
+            {
+                "protein_id": protein_id,
+                "peptide_seq": protein_seq,
+                "lysine_position": lysine_position,
+                "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                "sumoylation_class_probs": sumoylation_class_probs,
+                "predicted_labels": predicted_labels
+            }
+            for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+        ]
+    return Response({"data": result_list}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+
+def denemeFastaFile(request):
+    file_obj = request.FILES.get('file')
+    if file_obj:
+        file_name, file_extension = file_obj.name.split('.')
+
+        if str(file_extension.lower()) != 'fasta':
+            return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        records = file_obj.read().decode('utf-8')
+        fasta_file = StringIO(records)
+        data_processes = Data()
+        jsonList = []
+        idS, seqS, positionS = [], [], []
+        for record in SeqIO.parse(fasta_file, "fasta"):
+            protein_ids, protein_seqs, k_positions = seqIOParser(record)
+            idS.extend(protein_ids)
+            seqS.extend(protein_seqs)
+            positionS.extend(k_positions)
+        
+        df = make_prediction(idS, seqS, positionS)  
+        result_list = [
+                {
+                    "protein_id": protein_id,
+                    "peptide_seq": protein_seq,
+                    "lysine_position": lysine_position,
+                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                    "sumoylation_class_probs": sumoylation_class_probs,
+                    "predicted_labels": predicted_labels
+                }
+                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+            ]
+        return Response({"data": result_list}, status=status.HTTP_200_OK)
+    else:
+        return Response({"message": "An error occured."}, status=status.HTTP_400_BAD_REQUEST)
