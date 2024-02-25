@@ -24,5 +24,5 @@ urlpatterns = [
     path('uniprot-prediction/', uniprotPrediction),
     path('protein-sequence-prediction/', proteinSequence),
     path('fasta-file-prediction/', fastaFile),
-]
+    ]
 
