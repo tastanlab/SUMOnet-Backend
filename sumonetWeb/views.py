@@ -1,6 +1,6 @@
-from sumonetML.utils.data_pipe import Data
+from sumonet.utils.data_pipe import Data
 from rest_framework.decorators import api_view, parser_classes
-from sumonet.serializers import UniprotSerializer
+from sumonetWeb.serializers import UniprotSerializer
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser

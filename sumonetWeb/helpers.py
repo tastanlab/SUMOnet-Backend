@@ -1,7 +1,7 @@
 import pandas as pd
-from sumonetML.model.architecture import SUMOnet
-from sumonetML.utils.encodings import Encoding
-from sumonetML.utils.data_pipe import Data
+from sumonet.model.architecture import SUMOnet
+from sumonet.utils.encodings import Encoding
+from sumonet.utils.data_pipe import Data
 
 
 #* The create_dataframe function creates a pandas DataFrame from the protein_id, protein_seq, k_position, predicted_probs, and predicted_labels.
