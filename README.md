@@ -39,8 +39,9 @@ After you set up the virtual environment and activate it, you have to install th
 - requests
 - biopython
 - loguru
+- sumonet
 
-To install all of the dependencies, write the following line to the terminal: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru`
+To install all of the dependencies, write the following line to the terminal: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru sumonet`
 
 ## Routes
 
