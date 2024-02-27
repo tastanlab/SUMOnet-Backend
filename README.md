@@ -47,8 +47,8 @@ To install all of the dependencies, write the following line to the terminal: `p
 
 To start the server, make sure that your are in the same directory with `manage.py` file. After that, write the following line to the terminal: `python manage.py runserver`.
 
-[!important]
-After starting the web server, there can be warnings about unapplied migrations. They are not important, you do not need to be distracted by that error.
+> [!important]
+> After starting the web server, there can be warnings about unapplied migrations. They are not important, you do not need to be distracted by that error.
 
 ## Database
 
