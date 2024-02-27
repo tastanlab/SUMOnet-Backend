@@ -93,4 +93,4 @@ For more information about the routes, please take a look at sumonetWeb/views.py
 
 ## Contact
 
-If you have any questions or problem, please reach eustun@sabanciuniv.edu(mailto:eustun@sabanciuniv.edu) or aturel@sabanciuniv.edu(mailto:aturel@sabanciuniv.edu)
+If you have any questions or problem, please reach [eustun@sabanciuniv.edu](mailto:eustun@sabanciuniv.edu) or [aturel@sabanciuniv.edu](mailto:aturel@sabanciuniv.edu)
