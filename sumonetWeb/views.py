@@ -20,8 +20,14 @@ def uniprotPrediction(request):
         try:
             lysine_position = serializer.data['lysine_position']
 
+            lysine_position = int(lysine_position) # This line will raise a ValueError if the conversion fails
+
         except KeyError:
             lysine_position = None
+
+        except ValueError: #++
+            # Return a 400 Bad Request response if lysine_position is not an integer
+            return Response({'error': 'Lysine position must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
         
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
             
@@ -37,8 +43,11 @@ def uniprotPrediction(request):
         else:
             protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq,uniprot_id)
 
-        df = make_prediction(protein_ids, protein_seqs, k_positions)
-            
+        try: #++
+            df = make_prediction(protein_ids, protein_seqs, k_positions)
+        except TypeError:
+            return Response({'error': 'Invalid Lysine Position'}, status=status.HTTP_400_BAD_REQUEST)
+
         result = [
                 {
                     "protein_id": uniprot_id,
@@ -51,7 +60,9 @@ def uniprotPrediction(request):
                 for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
             ]
             
-        return Response(result, status=status.HTTP_200_OK)
+        #return Response(result, status=status.HTTP_200_OK)
+        #return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK)
+        return Response({"data": result}, status=status.HTTP_200_OK) #++
             
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
            
