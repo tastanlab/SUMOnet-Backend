@@ -22,7 +22,7 @@ from .views import uniprotPrediction, proteinSequence, fastaFile
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('uniprot-prediction/', uniprotPrediction, name='uniprot_prediction'),
-    path('protein-sequence-prediction/', proteinSequence),
-    path('fasta-file-prediction/', fastaFile),
+    path('protein-sequence-prediction/', proteinSequence, name="protein_sequence_prediction"),
+    path('fasta-file-prediction/', fastaFile, name="fasta_file_prediction"),
     ]
 

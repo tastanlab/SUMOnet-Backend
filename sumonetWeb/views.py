@@ -184,4 +184,4 @@ def fastaFile(request):
             ]
         return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
     else:
-        return Response({"error": "An error occured."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Please attach a file."}, status=status.HTTP_400_BAD_REQUEST)
