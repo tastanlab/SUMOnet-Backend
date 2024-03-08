@@ -1,6 +1,5 @@
 from sumonet.utils.data_pipe import Data
 from rest_framework.decorators import api_view, parser_classes
-from sumonetWeb.serializers import UniprotSerializer
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
@@ -8,46 +7,62 @@ from io import StringIO
 from Bio import SeqIO
 from .helpers import make_prediction, seqIOParser
 
+
+#! @desc: This function takes a uniprot id and lysine position as input 
+#! and returns the sumoylation prediction for the lysine position in the protein sequence.
+#! However, if user does not give the lysine position, it will return the sumoylation 
+#! prediction for all lysine positions in the protein sequence.
+
+#! route: POST /uniprot-prediction/
+
+#! @access: Public
+
 @api_view(['POST'])
 def uniprotPrediction(request):
+   
+    uniprot_id = request.data.get('uniprot_id', '')
+    lysine_position = request.data.get('lysine_position', '')
+    data_processes = Data()
     
-    serializer = UniprotSerializer(data=request.data)
+    if uniprot_id == '' or uniprot_id == None:
+        return Response({'error': 'Uniprot ID must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
     
-    if serializer.is_valid():
-        data_processes = Data()
-        uniprot_id = serializer.data['uniprot_id']  
-
-        try:
-            lysine_position = serializer.data['lysine_position']
-
-            lysine_position = int(lysine_position) # This line will raise a ValueError if the conversion fails
-
-        except KeyError:
-            lysine_position = None
-
-        except ValueError: #++
-            # Return a 400 Bad Request response if lysine_position is not an integer
-            return Response({'error': 'Lysine position must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+    else:
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
-            
-        if protein_seq == None:
-            return Response({'error': 'No sequence found with this UniprotID.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if protein_seq == '' or protein_seq == None:
+            return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+
         
-        if uniprot_id == '' or uniprot_id == None:
-            return Response({'error': 'UniprotID must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if lysine_position != '' and lysine_position != None:
+            try:
+                lysine_position = int(lysine_position)
+            except KeyError:
+                return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({'error': 'Lysine position must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
+            except IndexError:
+                return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            
+        try:
+            if lysine_position != '' and lysine_position != None:
+                protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id, lysine_position)
                 
-        if lysine_position:
-            lysine_position = int(lysine_position)
-            protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq,uniprot_id,lysine_position)
-        else:
-            protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq,uniprot_id)
+            else:
+                protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id)
 
-        try: #++
             df = make_prediction(protein_ids, protein_seqs, k_positions)
-        except TypeError:
-            return Response({'error': 'Invalid Lysine Position'}, status=status.HTTP_400_BAD_REQUEST)
 
+        except IndexError:
+            return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:
+            return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+        except TypeError:
+            return Response({'error': 'No data found with this lysine position and uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        
         result = [
                 {
                     "protein_id": uniprot_id,
@@ -63,12 +78,20 @@ def uniprotPrediction(request):
         #return Response(result, status=status.HTTP_200_OK)
         #return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK)
         return Response({"data": result}, status=status.HTTP_200_OK) #++
-            
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-           
+    
+    return Response({'error': 'An error occured.'}, status=status.HTTP_400_BAD_REQUEST)
         
         
-        
+
+#! @desc: This function takes a protein sequence as input and returns the 
+#! sumoylation prediction for all lysine positions in the protein sequence.
+#! You must be careful with the input format. The input must be in fasta format. 
+#! The protein sequence must be in the second line of the fasta file.
+
+#! route: POST /protein-sequence-prediction/
+
+#! @access: Public
+
 @api_view(['POST'])
 def proteinSequence(request):
     protein_seq = request.data.get('protein_seq', '')
@@ -105,6 +128,16 @@ def proteinSequence(request):
         ]
     return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
 
+
+
+#! @desc: This function takes a fasta file as input and returns the 
+#! sumoylation prediction for all lysine positions in the protein sequence.
+#! You must be careful with the input format. The protein sequence must be in the second line of the fasta file.
+#! Please leave at least one line of space between the protein sequence and the next protein sequence(s).
+
+#! route: POST /fasta-file-prediction/
+
+#! @access: Public
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
