@@ -114,6 +114,8 @@ def proteinSequence(request):
 
     except ValueError:
         return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+    except KeyError:
+         return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
      
     result_list = [
             {
