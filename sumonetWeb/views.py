@@ -77,7 +77,7 @@ def uniprotPrediction(request):
             
         #return Response(result, status=status.HTTP_200_OK)
         #return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK)
-        return Response({"data": result}, status=status.HTTP_200_OK) #++
+        return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK) #++
     
     return Response({'error': 'An error occured.'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -101,14 +101,20 @@ def proteinSequence(request):
         return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
 
     fasta_file = StringIO(protein_seq)
+
     idS, seqS, positionS = [], [], []
     for record in SeqIO.parse(fasta_file, "fasta"):
+
+        if (len(record.seq) < 15):
+            return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
+     
+        
         protein_ids, protein_seqs, k_positions = seqIOParser(record)
         idS.extend(protein_ids)
         seqS.extend(protein_seqs)
         positionS.extend(k_positions)
         
-        
+    
     try:
         df = make_prediction(idS, seqS, positionS) 
 
@@ -119,7 +125,7 @@ def proteinSequence(request):
      
     result_list = [
             {
-                "protein_id": protein_id,
+                "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
                 "peptide_seq": protein_seq,
                 "lysine_position": lysine_position,
                 "nonsumoylation_class_probs": nonsumoylation_class_probs,
@@ -148,8 +154,10 @@ def fastaFile(request):
     if file_obj:
         file_name, file_extension = file_obj.name.split('.')
 
-        if str(file_extension.lower()) != 'fasta':
+       
+        if str(file_extension.lower()) != "fasta":
             return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+            
 
         records = file_obj.read().decode('utf-8')
 

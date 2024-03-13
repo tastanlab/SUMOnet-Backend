@@ -47,6 +47,7 @@ def make_prediction(protein_ids, protein_seqs, k_positions):
 
 #* The seqIOParser function takes the record as input and returns the protein_ids, protein_seqs, and k_positions.
 def seqIOParser(record):
+
     data_processes = Data()
     protein_ids, protein_seqs, k_positions = [], [], []
     
