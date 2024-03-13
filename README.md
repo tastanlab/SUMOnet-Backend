@@ -26,23 +26,9 @@ Write the following line to the terminal: `source env/bin/activate`
 
 ## Installing the dependencies
 
-After you set up the virtual environment and activate it, you have to install the necessary dependencies below:
+After you set up the virtual environment and activate it, you have to install the necessary dependencies by following the steps:
 
-- django
-- djangorestframework
-- numpy
-- pandas
-- scikit-learn
-- joblib
-- tensorflow
-- keras
-- requests
-- biopython
-- loguru
-- sumonet
-- django-cors-headers
-
-To install all of the dependencies, write the following line to the terminal: `pip install django djangorestframework numpy pandas scikit-learn joblib tensorflow keras requests biopython loguru sumonet`
+To install all of the dependencies, write the following line to the terminal: `pip install -r requirements.txt`
 
 ## Starting the server
 

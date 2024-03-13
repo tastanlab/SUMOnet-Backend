@@ -1,4 +1,5 @@
-from sumonet.utils.data_pipe import Data
+
+from sumonetML.sumonet.utils.data_pipe import Data
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework import status
 from rest_framework.response import Response
@@ -57,8 +58,8 @@ def uniprotPrediction(request):
 
         except IndexError:
             return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
-        except ValueError:
-            return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+        #except ValueError:
+            #return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
         except TypeError:
             return Response({'error': 'No data found with this lysine position and uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
 
