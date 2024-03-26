@@ -107,7 +107,7 @@ def proteinSequence(request):
     for record in SeqIO.parse(fasta_file, "fasta"):
 
         if (len(record.seq) < 15):
-            return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
+           return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
      
         
         protein_ids, protein_seqs, k_positions = seqIOParser(record)
@@ -156,43 +156,57 @@ def fastaFile(request):
         file_name, file_extension = file_obj.name.split('.')
 
        
-        if str(file_extension.lower()) != "fasta":
-            return Response({'error': 'Invalid file extension. Only fasta files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+        if str(file_extension.lower()) == "fasta" or str(file_extension.lower()) == "txt" :
+
+            records = file_obj.read().decode('utf-8')
+
+            if records == '' or records == None:
+                return Response({'error': 'This file does not contain protein sequence(s).'}, status=status.HTTP_400_BAD_REQUEST)
+            #print(records)
             
 
-        records = file_obj.read().decode('utf-8')
 
-        if records == '' or records == None:
-            return Response({'error': 'This file does not contain protein sequence(s).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+            fasta_file = StringIO(records)
+            idS, seqS, positionS = [], [], []
+            for record in SeqIO.parse(fasta_file, "fasta"):
 
+                #print("record", record.seq)
 
-        fasta_file = StringIO(records)
-        idS, seqS, positionS = [], [], []
-        for record in SeqIO.parse(fasta_file, "fasta"):
-            protein_ids, protein_seqs, k_positions = seqIOParser(record)
-            idS.extend(protein_ids)
-            seqS.extend(protein_seqs)
-            positionS.extend(k_positions)
-        
-        try:
+                if (len(record.seq) < 15):
+                    return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            df = make_prediction(idS, seqS, positionS)  
+                
 
-        except ValueError:
-            return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        result_list = [
-                {
-                    "protein_id": protein_id,
-                    "peptide_seq": protein_seq,
-                    "lysine_position": lysine_position,
-                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                    "sumoylation_class_probs": sumoylation_class_probs,
-                    "predicted_labels": predicted_labels
-                }
-                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
-            ]
-        return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
+                protein_ids, protein_seqs, k_positions = seqIOParser(record)
+                #print("Protein_ids: ", protein_ids, "\n")
+                #print("Protein_ids: ", protein_seqs, "\n")
+                #print("Protein_ids: ", k_positions, "\n")
+                idS.extend(protein_ids)
+                seqS.extend(protein_seqs)
+                positionS.extend(k_positions)
+            
+            try:
+
+                df = make_prediction(idS, seqS, positionS)  
+
+            except ValueError:
+                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+            except KeyError:
+                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            result_list = [
+                    {
+                        "protein_id": protein_id,
+                        "peptide_seq": protein_seq,
+                        "lysine_position": lysine_position,
+                        "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                        "sumoylation_class_probs": sumoylation_class_probs,
+                        "predicted_labels": predicted_labels
+                    }
+                    for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+                ]
+            return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Invalid file extension. Only fasta and txt files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response({"error": "Please attach a file."}, status=status.HTTP_400_BAD_REQUEST)
