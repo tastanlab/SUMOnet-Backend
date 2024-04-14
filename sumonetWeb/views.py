@@ -45,7 +45,10 @@ def uniprotPrediction(request):
                 return Response({'error': 'Lysine position must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
             except IndexError:
                 return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
+
+            if lysine_position < 0: # This line checks the negativity of the integer other exceptions hold for only precaution. 
+                return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive.'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
             if lysine_position != '' and lysine_position != None:
@@ -58,8 +61,8 @@ def uniprotPrediction(request):
 
         except IndexError:
             return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
-        #except ValueError:
-            #return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:
+            return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive.'}, status=status.HTTP_400_BAD_REQUEST)
         except TypeError:
             return Response({'error': 'No data found with this lysine position and uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
 
