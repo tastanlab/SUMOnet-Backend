@@ -199,7 +199,7 @@ def fastaFile(request):
             
             result_list = [
                     {
-                        "protein_id": protein_id,
+                        "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
                         "peptide_seq": protein_seq,
                         "lysine_position": lysine_position,
                         "nonsumoylation_class_probs": nonsumoylation_class_probs,
