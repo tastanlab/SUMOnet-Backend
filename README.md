@@ -78,6 +78,32 @@ We prepared different routes for different kind of inputs.
 
 For more information about the routes, please take a look at sumonetWeb/views.py file. This file contains routes for functionalities.
 
+## API Documentation
+
+Detailed explanation for request type and response type can be seen from the following link: https://docs.google.com/document/d/1vUGhEV5oa-8WZYv_gfbh6oWbaFuhxcrQgFWU-8qHF_0/edit?usp=sharing
+
+## Tests
+
+### Unit Tests
+
+This Python script contains a series of test cases for a Django REST API, focusing on validation of Uniprot ID handling. It uses Django's testing framework along with the Django REST Framework's APIClient for sending requests and evaluating responses. The tests ensure proper response codes and error messages are returned under various conditions, such as empty or incorrect Uniprot IDs.
+
+Key Features:
+
+Test cases and expected outputs can be accessed from the folllowing link: https://docs.google.com/document/d/1zeTQoopuXNkh80EMZUu0ro7CFHZPM1Z6nzKmzTIqxp8/edit?usp=sharing
+
+Requirements:
+
+Django
+Django REST Framework
+(Optional) Additional dependencies may be required, such as ddt for data-driven testing.
+Usage:
+
+The script is designed to be run as part of Django's test suite via the "python manage.py test sumonetWeb" command.
+This script is essential for developers working with this specific REST API, ensuring robustness and reliability through comprehensive testing.
+
+### Postman Tests
+
 ## Contact
 
 If you have any questions or problem, please reach [eustun@sabanciuniv.edu](mailto:eustun@sabanciuniv.edu) or [aturel@sabanciuniv.edu](mailto:aturel@sabanciuniv.edu)
