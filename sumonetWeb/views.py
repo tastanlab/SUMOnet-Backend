@@ -74,7 +74,7 @@ def uniprotPrediction(request):
                     "lysine_position": lysine_position,
                     "nonsumoylation_class_probs": nonsumoylation_class_probs,
                     "sumoylation_class_probs": sumoylation_class_probs,
-                    "predicted_labels": predicted_labels
+                    "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
                 }
                 for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
             ]
@@ -134,7 +134,7 @@ def proteinSequence(request):
                 "lysine_position": lysine_position,
                 "nonsumoylation_class_probs": nonsumoylation_class_probs,
                 "sumoylation_class_probs": sumoylation_class_probs,
-                "predicted_labels": predicted_labels
+                "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
             }
             for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
         ]
@@ -204,7 +204,7 @@ def fastaFile(request):
                         "lysine_position": lysine_position,
                         "nonsumoylation_class_probs": nonsumoylation_class_probs,
                         "sumoylation_class_probs": sumoylation_class_probs,
-                        "predicted_labels": predicted_labels
+                        "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
                     }
                     for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
                 ]
