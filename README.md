@@ -104,6 +104,8 @@ This script is essential for developers working with this specific REST API, ens
 
 ### Postman Tests
 
+Postive and negative path tests are automated with Postman. Tests can be accessible from https://www.postman.com/sumonet/workspace/my-workspace/collection/34442047-794ed123-d395-4e6a-b7cc-b41694e49e0a?action=share&source=copy-link&creator=34442047
+
 ## Contact
 
 If you have any questions or problem, please reach [eustun@sabanciuniv.edu](mailto:eustun@sabanciuniv.edu) or [aturel@sabanciuniv.edu](mailto:aturel@sabanciuniv.edu)
