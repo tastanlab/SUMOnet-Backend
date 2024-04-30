@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser
 from io import StringIO
 from Bio import SeqIO
 from .helpers import make_prediction, seqIOParser
+import re
 
 
 #! @desc: This function takes a uniprot id and lysine position as input 
@@ -18,6 +19,41 @@ from .helpers import make_prediction, seqIOParser
 
 #! @access: Public
 
+def is_valid_uniprot_id(uniprot_id):
+    return re.fullmatch(r'[a-zA-Z0-9 ,]*', uniprot_id) is not None
+
+def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id):
+    data_processes = Data()
+
+    try:
+        if lysine_position != '' and lysine_position != None:
+            protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id, lysine_position)
+        else:
+            protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id)
+
+        df = make_prediction(protein_ids, protein_seqs, k_positions)
+
+    except IndexError:
+        return {'error': 'Invalid Lysine Position. Index out of range'}
+    except ValueError:
+        return {'error': 'Invalid Lysine Position. Lysine Position must be positive.'}
+    except TypeError:
+        return {'error': 'No data found with this lysine position and uniprot id.'}
+
+    result = [
+        {
+            "protein_id": uniprot_id,
+            "peptide_seq": protein_seq,
+            "lysine_position": lysine_position,
+            "nonsumoylation_class_probs": nonsumoylation_class_probs,
+            "sumoylation_class_probs": sumoylation_class_probs,
+            "predicted_labels": predicted_labels
+        }
+        for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+    ]
+    return result
+
+
 @api_view(['POST'])
 def uniprotPrediction(request):
    
@@ -27,6 +63,31 @@ def uniprotPrediction(request):
     
     if uniprot_id == '' or uniprot_id == None:
         return Response({'error': 'Uniprot ID must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif not is_valid_uniprot_id(uniprot_id):
+        return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif "," in uniprot_id:
+        if is_valid_uniprot_id(uniprot_id): # Logic is working in the previous elif line. However, this line was put as a precaution.
+            if lysine_position == "":
+                result_list = []
+                uniprot_id_list = uniprot_id.replace(' ', '').split(",")
+                print(uniprot_id_list)
+                for uid in uniprot_id_list:
+                    protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uid)
+                    if protein_seq == '' or protein_seq == None:
+                        return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uid)
+                        result_list.append(result)
+                flattened_list = [item for sublist in result_list for item in sublist]
+                return Response({"data": flattened_list, "length": len(flattened_list)}, status=status.HTTP_200_OK)
+            elif not lysine_position == "":
+                return Response({'error': 'You cannot enter lysine position for multiple Uniprot ID.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+
     
     else:
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
@@ -46,42 +107,17 @@ def uniprotPrediction(request):
             except IndexError:
                 return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
 
-
             if lysine_position < 0: # This line checks the negativity of the integer other exceptions hold for only precaution. 
                 return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive.'}, status=status.HTTP_400_BAD_REQUEST)
             
-        try:
-            if lysine_position != '' and lysine_position != None:
-                protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id, lysine_position)
-                
-            else:
-                protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id)
+            if lysine_position > len(protein_seq):
+                return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
 
-            df = make_prediction(protein_ids, protein_seqs, k_positions)
+        result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id)
+        if 'error' in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
-        except IndexError:
-            return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
-        except ValueError:
-            return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive.'}, status=status.HTTP_400_BAD_REQUEST)
-        except TypeError:
-            return Response({'error': 'No data found with this lysine position and uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        
-        result = [
-                {
-                    "protein_id": uniprot_id,
-                    "peptide_seq": protein_seq,
-                    "lysine_position": lysine_position,
-                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                    "sumoylation_class_probs": sumoylation_class_probs,
-                    "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
-                }
-                for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
-            ]
-            
-        #return Response(result, status=status.HTTP_200_OK)
-        #return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK)
-        return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK) #++
+        return Response({"data": result, "length": len(result)}, status=status.HTTP_200_OK)
     
     return Response({'error': 'An error occured.'}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -134,7 +170,7 @@ def proteinSequence(request):
                 "lysine_position": lysine_position,
                 "nonsumoylation_class_probs": nonsumoylation_class_probs,
                 "sumoylation_class_probs": sumoylation_class_probs,
-                "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
+                "predicted_labels": predicted_labels
             }
             for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
         ]
@@ -158,41 +194,56 @@ def fastaFile(request):
     if file_obj:
         file_name, file_extension = file_obj.name.split('.')
 
-        if str(file_extension.lower()) == "fasta" or str(file_extension.lower()) == "txt":
+       
+        if str(file_extension.lower()) == "fasta" or str(file_extension.lower()) == "txt" :
 
             records = file_obj.read().decode('utf-8')
 
-            if not records:
+            if records == '' or records == None:
                 return Response({'error': 'This file does not contain protein sequence(s).'}, status=status.HTTP_400_BAD_REQUEST)
+            #print(records)
+            
+
 
             fasta_file = StringIO(records)
             idS, seqS, positionS = [], [], []
             for record in SeqIO.parse(fasta_file, "fasta"):
 
-                if len(record.seq) < 15:
+                #print("record", record.seq)
+
+                if (len(record.seq) < 15):
                     return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
 
+                
+
                 protein_ids, protein_seqs, k_positions = seqIOParser(record)
+                #print("Protein_ids: ", protein_ids, "\n")
+                #print("Protein_ids: ", protein_seqs, "\n")
+                #print("Protein_ids: ", k_positions, "\n")
                 idS.extend(protein_ids)
                 seqS.extend(protein_seqs)
                 positionS.extend(k_positions)
-
+            
             try:
-                df = make_prediction(idS, seqS, positionS)
-            except (ValueError, KeyError):
+
+                df = make_prediction(idS, seqS, positionS)  
+
+            except ValueError:
                 return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            result_list = []
-            for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']):
-                result_list.append({
-                    "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
-                    "peptide_seq": protein_seq,
-                    "lysine_position": lysine_position,
-                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                    "sumoylation_class_probs": sumoylation_class_probs,
-                    "predicted_labels": "Non-Sumoylated" if predicted_labels == 0 else "Sumoylated"
-                })
-
+            except KeyError:
+                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            result_list = [
+                    {
+                        "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
+                        "peptide_seq": protein_seq,
+                        "lysine_position": lysine_position,
+                        "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                        "sumoylation_class_probs": sumoylation_class_probs,
+                        "predicted_labels": predicted_labels
+                    }
+                    for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+                ]
             return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
         else:
             return Response({'error': 'Invalid file extension. Only fasta and txt files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
