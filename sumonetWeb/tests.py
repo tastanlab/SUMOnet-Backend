@@ -13,7 +13,6 @@ class TestSumonet(TestCase):
         
     #! Uniprot Prediction Test Cases
 
-    
     def test_EmptyUniprotID(self): # Test for empty uniprot ID returns 400
         url = reverse('uniprot_prediction') 
         data = {'uniprot_id': ''}
@@ -92,6 +91,56 @@ class TestSumonet(TestCase):
                 self.assertEqual(response.status_code, status.HTTP_200_OK)
                 self.assertIsInstance(response.data, dict)
     
+
+    def test_ValidUniprotList(self):
+        url = reverse('uniprot_prediction')
+        data = [{'uniprot_id': "O00566, A0JP26"}, {'uniprot_id': 'O00566, A0JP26 ,  O14763'}, {'uniprot_id': 'O00566 , O14763' },
+        {'uniprot_id': 'O00566 , O14763, Q6GZV6'}, {'uniprot_id': 'O94762'} ]
+
+        for test_case in data:
+            with self.subTest(test_case=test_case):
+                url = reverse('uniprot_prediction')
+                response = self.client.post(url, test_case, format='json')
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertIsInstance(response.data, dict)
+  
+    def test_ValidUniprotList(self):
+        url = reverse('uniprot_prediction')
+        data = [{'uniprot_id': "O00566, O00566"}, {'uniprot_id': '000566, O00566'}, {'uniprot_id': 'O00566, 000566' },
+        {'uniprot_id': 'O00566, AoJP26, O14763'}, {'uniprot_id': 'O00566, AoJP26,  014763'}, {'uniprot_id': 'AoJP26, O00566, 014763'}, {'uniprot_id': 'AoJP26, 014763 ,O00566'} ]
+
+        for test_case in data:
+            with self.subTest(test_case=test_case):
+                response = self.client.post(url, test_case, format='json')
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertIsInstance(response.data, dict)
+                
+                response_json = response.json()
+                
+                self.assertIn('invalid_idS', response_json)
+                self.assertIsInstance(response_json['invalid_idS'], list)
+    
+    def test_ValidUniprotListWithLysinePosition(self): # negative lysine position test
+        url = reverse('uniprot_prediction')
+        data = [
+        { "uniprot_id": "O00566, A0JP26", "lysine_position": 20 },
+        { "uniprot_id": "O00566, A0JP26", "lysine_position": "1,2,3" },
+        { "uniprot_id": "O00566, A0JP26", "lysine_position": "20,17" },
+        { "uniprot_id": "O00566, A0JP26", "lysine_position": "aaaaa,bbbb" },
+        { "uniprot_id": "O00566, A0JP26", "lysine_position": "aaa;bbb" },
+        ]
+
+        for test_case in data:
+            with self.subTest(test_case=test_case):
+                url = reverse('uniprot_prediction')
+                response = self.client.post(url, test_case, format='json')
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data, {'error': "You cannot enter lysine position for multiple Uniprot ID."}) 
+
+ 
     def test_InvalidStringLysinePosition(self): # Invalid lysine position for string
         url = reverse('uniprot_prediction')
         data = [{'uniprot_id': 'O00566', 'lysine_position': 'aaaa'}, {'uniprot_id': 'O00566', 'lysine_position': 'abcdef'}, {'uniprot_id': 'O00566', 'lysine_position': 'ghty'} ]
@@ -127,7 +176,8 @@ class TestSumonet(TestCase):
                 response = self.client.post(url, test_case, format='json')
 
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertEqual(response.data, {'error': 'Invalid Lysine Position. Lysine Position must be positive.'})   
+                self.assertEqual(response.data, {'error': 'Invalid Lysine Position. Lysine Position must be positive.'})  
+         
 
       
       
@@ -259,4 +309,3 @@ class TestSumonet(TestCase):
         self.assertEqual(response.data, {'error': 'Invalid protein sequence.'}) 
 
 #! File Upload Test Cases End
-    

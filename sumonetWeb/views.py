@@ -57,6 +57,7 @@ def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id):
 @api_view(['POST'])
 def uniprotPrediction(request):
    
+    at_least_one_valid_uniprot_id = False
     uniprot_id = request.data.get('uniprot_id', '')
     lysine_position = request.data.get('lysine_position', '')
     data_processes = Data()
@@ -68,27 +69,35 @@ def uniprotPrediction(request):
         return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
 
     elif "," in uniprot_id:
-        if is_valid_uniprot_id(uniprot_id): # Logic is working in the previous elif line. However, this line was put as a precaution.
+        if is_valid_uniprot_id(uniprot_id): # Logic is working in the previous elif line. However, this line was put as a precaution. It is for character checker not uniprot id.
             if lysine_position == "":
                 result_list = []
+                invalid_uniprot_id_list = []
+                uniquness_list = []
                 uniprot_id_list = uniprot_id.replace(' ', '').split(",")
                 print(uniprot_id_list)
                 for uid in uniprot_id_list:
-                    protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uid)
-                    if protein_seq == '' or protein_seq == None:
-                        return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
-                    else:
-                        result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uid)
-                        result_list.append(result)
+                    if uid not in uniquness_list:
+                        uniquness_list.append(uid)
+                        protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uid)
+                        if (protein_seq == '' or protein_seq == None):
+                            invalid_uniprot_id_list.append(uid)
+                            pass
+                        else:
+                            at_least_one_valid_uniprot_id = True
+                            result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uid)
+                            result_list.append(result)
                 flattened_list = [item for sublist in result_list for item in sublist]
-                return Response({"data": flattened_list, "length": len(flattened_list)}, status=status.HTTP_200_OK)
+                if at_least_one_valid_uniprot_id:
+                    return Response({"data": flattened_list, "length": len(flattened_list), "invalid_idS": invalid_uniprot_id_list}, status=status.HTTP_200_OK)
+                elif not at_least_one_valid_uniprot_id:
+                    return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+
             elif not lysine_position == "":
                 return Response({'error': 'You cannot enter lysine position for multiple Uniprot ID.'}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-
-    
+            
     else:
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
 
@@ -153,7 +162,8 @@ def proteinSequence(request):
         idS.extend(protein_ids)
         seqS.extend(protein_seqs)
         positionS.extend(k_positions)
-        
+
+
     
     try:
         df = make_prediction(idS, seqS, positionS) 
@@ -161,7 +171,7 @@ def proteinSequence(request):
     except ValueError:
         return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
     except KeyError:
-         return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+       return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
      
     result_list = [
             {
