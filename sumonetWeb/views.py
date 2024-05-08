@@ -70,7 +70,7 @@ def uniprotPrediction(request):
 
     elif "," in uniprot_id:
         if is_valid_uniprot_id(uniprot_id): # Logic is working in the previous elif line. However, this line was put as a precaution. It is for character checker not uniprot id.
-            if lysine_position == "":
+            if lysine_position == "" or lysine_position == None :
                 result_list = []
                 invalid_uniprot_id_list = []
                 uniquness_list = []
