@@ -22,11 +22,11 @@ import re
 def is_valid_uniprot_id(uniprot_id):
     return re.fullmatch(r'[a-zA-Z0-9 ,]*', uniprot_id) is not None
 
-def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id):
+def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id, threshold):
     data_processes = Data()
 
     try:
-        if lysine_position != '' and lysine_position != None:
+        if lysine_position != '' and lysine_position is not None:
             protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id, lysine_position)
         else:
             protein_ids, protein_seqs, k_positions = data_processes.uniprot_id_input(protein_seq, uniprot_id)
@@ -34,24 +34,26 @@ def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id):
         df = make_prediction(protein_ids, protein_seqs, k_positions)
 
     except IndexError:
-        return {'error': 'Invalid Lysine Position. Index out of range'}
+        return {'error': 'Invalid Lysine Position. Index out of range!'}
     except ValueError:
-        return {'error': 'Invalid Lysine Position. Lysine Position must be positive.'}
+        return {'error': 'Invalid Lysine Position. Lysine Position must be positive!'}
     except TypeError:
-        return {'error': 'No data found with this lysine position and uniprot id.'}
+        return {'error': 'No data found with this lysine position and Uniprot ID!'}
 
-    result = [
-        {
-            "protein_id": uniprot_id,
-            "peptide_seq": protein_seq,
-            "lysine_position": lysine_position,
-            "nonsumoylation_class_probs": nonsumoylation_class_probs,
-            "sumoylation_class_probs": sumoylation_class_probs,
-            "predicted_labels": predicted_labels
-        }
-        for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
-    ]
+    result = []
+    for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']):
+        if sumoylation_class_probs >= threshold:
+            result.append({
+                "protein_id": uniprot_id,
+                "peptide_seq": protein_seq,
+                "lysine_position": lysine_position,
+                "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                "sumoylation_class_probs": sumoylation_class_probs,
+                "predicted_labels": predicted_labels
+            })
+
     return result
+
 
 
 @api_view(['POST'])
@@ -60,13 +62,23 @@ def uniprotPrediction(request):
     at_least_one_valid_uniprot_id = False
     uniprot_id = request.data.get('uniprot_id', '')
     lysine_position = request.data.get('lysine_position', '')
+    threshold = request.data.get('threshold', 0.5)
+
+    try:
+        threshold = float(threshold)
+    except ValueError:
+        return Response({'error': 'Threshold must be a number.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not (0 <= threshold <= 1):
+        return Response({'error': 'Threshold must be between 0 and 1.'}, status=status.HTTP_400_BAD_REQUEST)
+
     data_processes = Data()
     
     if uniprot_id == '' or uniprot_id == None:
-        return Response({'error': 'Uniprot ID must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Uniprot ID must be entered!'}, status=status.HTTP_400_BAD_REQUEST)
     
     elif not is_valid_uniprot_id(uniprot_id):
-        return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'You can only use comma for entering Uniprot ID list!'}, status=status.HTTP_400_BAD_REQUEST)
 
     elif "," in uniprot_id:
         if is_valid_uniprot_id(uniprot_id): # Logic is working in the previous elif line. However, this line was put as a precaution. It is for character checker not uniprot id.
@@ -85,24 +97,24 @@ def uniprotPrediction(request):
                             pass
                         else:
                             at_least_one_valid_uniprot_id = True
-                            result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uid)
+                            result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uid, threshold)
                             result_list.append(result)
                 flattened_list = [item for sublist in result_list for item in sublist]
                 if at_least_one_valid_uniprot_id:
                     return Response({"data": flattened_list, "length": len(flattened_list), "invalid_idS": invalid_uniprot_id_list}, status=status.HTTP_200_OK)
                 elif not at_least_one_valid_uniprot_id:
-                    return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': 'No protein sequence found with this Uniprot ID!'}, status=status.HTTP_400_BAD_REQUEST)
 
             elif not lysine_position == "":
-                return Response({'error': 'You cannot enter lysine position for multiple Uniprot ID.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'You cannot enter lysine position for multiple Uniprot ID!'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response({'error': 'You can only use comma for entering ID list.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'You can only use comma for entering Uniprot ID list!'}, status=status.HTTP_400_BAD_REQUEST)
             
     else:
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
 
         if protein_seq == '' or protein_seq == None:
-            return Response({'error': 'No protein sequence found with this uniprot id.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'No protein sequence found with this Uniprot ID!'}, status=status.HTTP_400_BAD_REQUEST)
 
         
 
@@ -110,19 +122,19 @@ def uniprotPrediction(request):
             try:
                 lysine_position = int(lysine_position)
             except KeyError:
-                return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid Lysine Position!'}, status=status.HTTP_400_BAD_REQUEST)
             except ValueError:
-                return Response({'error': 'Lysine position must be an integer.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Lysine position must be an integer!'}, status=status.HTTP_400_BAD_REQUEST)
             except IndexError:
-                return Response({'error': 'Invalid Lysine Position.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid Lysine Position!'}, status=status.HTTP_400_BAD_REQUEST)
 
             if lysine_position < 0: # This line checks the negativity of the integer other exceptions hold for only precaution. 
-                return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid Lysine Position. Lysine Position must be positive!'}, status=status.HTTP_400_BAD_REQUEST)
             
             if lysine_position > len(protein_seq):
-                return Response({'error': 'Invalid Lysine Position. Index out of range'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid Lysine Position. Index out of range!'}, status=status.HTTP_400_BAD_REQUEST)
 
-        result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id)
+        result = An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id, threshold)
         if 'error' in result:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
@@ -147,7 +159,7 @@ def proteinSequence(request):
 
 
     if protein_seq == '' or protein_seq == None:
-        return Response({'error': 'Protein sequence must be entered.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Protein sequence must be entered!'}, status=status.HTTP_400_BAD_REQUEST)
 
     fasta_file = StringIO(protein_seq)
 
@@ -155,7 +167,7 @@ def proteinSequence(request):
     for record in SeqIO.parse(fasta_file, "fasta"):
 
         if (len(record.seq) < 15):
-           return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
+           return Response({'error': 'Protein sequence must be at least 15 amino acids long!'}, status=status.HTTP_400_BAD_REQUEST)
      
         
         protein_ids, protein_seqs, k_positions = seqIOParser(record)
@@ -169,9 +181,9 @@ def proteinSequence(request):
         df = make_prediction(idS, seqS, positionS) 
 
     except ValueError:
-        return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
     except KeyError:
-       return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+       return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
      
     result_list = [
             {
@@ -210,7 +222,7 @@ def fastaFile(request):
             records = file_obj.read().decode('utf-8')
 
             if records == '' or records == None:
-                return Response({'error': 'This file does not contain protein sequence(s).'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'This file does not contain protein sequence(s)!'}, status=status.HTTP_400_BAD_REQUEST)
             #print(records)
             
 
@@ -222,7 +234,7 @@ def fastaFile(request):
                 #print("record", record.seq)
 
                 if (len(record.seq) < 15):
-                    return Response({'error': 'Protein sequence must be at least 15 amino acids long.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': 'Protein sequence must be at least 15 amino acids long!'}, status=status.HTTP_400_BAD_REQUEST)
 
                 
 
@@ -239,9 +251,9 @@ def fastaFile(request):
                 df = make_prediction(idS, seqS, positionS)  
 
             except ValueError:
-                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
             except KeyError:
-                return Response({'error': 'Invalid protein sequence.'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
             
             result_list = [
                     {
@@ -256,6 +268,6 @@ def fastaFile(request):
                 ]
             return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
         else:
-            return Response({'error': 'Invalid file extension. Only fasta and txt files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid file extension. Only fasta and txt files are allowed!'}, status=status.HTTP_400_BAD_REQUEST)
     else:
-        return Response({"error": "Please attach a file."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Please attach a file!"}, status=status.HTTP_400_BAD_REQUEST)
