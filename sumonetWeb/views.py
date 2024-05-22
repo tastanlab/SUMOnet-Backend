@@ -156,47 +156,58 @@ def uniprotPrediction(request):
 @api_view(['POST'])
 def proteinSequence(request):
     protein_seq = request.data.get('protein_seq', '')
+    invalid_responses = []  # Store invalid responses
 
-
-    if protein_seq == '' or protein_seq == None:
-        return Response({'error': 'Protein sequence must be entered!'}, status=status.HTTP_400_BAD_REQUEST)
+    if not protein_seq:
+        invalid_responses.append({'error': 'Protein sequence must be entered!'})
+        return Response({"data": [], "errors": invalid_responses}, status=status.HTTP_400_BAD_REQUEST)
 
     fasta_file = StringIO(protein_seq)
-
     idS, seqS, positionS = [], [], []
     for record in SeqIO.parse(fasta_file, "fasta"):
+        if len(record.seq) < 15:
+            invalid_responses.append({'error': 'Protein sequence must be at least 15 amino acids long!', 'ids': [record.id]})
+            continue
 
-        if (len(record.seq) < 15):
-           return Response({'error': 'Protein sequence must be at least 15 amino acids long!'}, status=status.HTTP_400_BAD_REQUEST)
-     
-        
         protein_ids, protein_seqs, k_positions = seqIOParser(record)
         idS.extend(protein_ids)
         seqS.extend(protein_seqs)
         positionS.extend(k_positions)
 
 
-    
-    try:
-        df = make_prediction(idS, seqS, positionS) 
+        try:
+            df = make_prediction(idS, seqS, positionS) 
+            
+        except (ValueError, KeyError) :
+            invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
 
-    except ValueError:
-        return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
-    except KeyError:
-       return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
-     
-    result_list = [
+    result_list = []
+    if idS:  # Proceed only if there are valid sequences to predict
+        
+        result_list = [
             {
                 "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
-                "peptide_seq": protein_seq,
+                "peptide_seq": peptide_seq,
                 "lysine_position": lysine_position,
                 "nonsumoylation_class_probs": nonsumoylation_class_probs,
                 "sumoylation_class_probs": sumoylation_class_probs,
                 "predicted_labels": predicted_labels
             }
-            for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+            for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
+                df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
+            )
         ]
-    return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
+       
+
+    if  len(result_list) == 0 and  len(invalid_responses) == 0:  # If no valid data and no prior errors, assume all input was invalid
+        return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif len(result_list) == 0 and len(invalid_responses) > 0:
+        return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Always return a response including both results and any errors
+    # response_status = status.HTTP_200_OK if result_list else status.HTTP_400_BAD_REQUEST
+    return Response({"data": result_list, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
 
 
 
@@ -213,8 +224,12 @@ def proteinSequence(request):
 @parser_classes([MultiPartParser])
 def fastaFile(request):
     file_obj = request.FILES.get('file')
+    invalid_responses = []  # Store invalid responses
     if file_obj:
         file_name, file_extension = file_obj.name.split('.')
+
+        if file_extension.lower() != "fasta" and file_extension.lower() != "txt":
+            return Response({'error': 'File must be in .fasta or .txt format!'}, status=status.HTTP_400_BAD_REQUEST)
 
        
         if str(file_extension.lower()) == "fasta" or str(file_extension.lower()) == "txt" :
@@ -234,14 +249,12 @@ def fastaFile(request):
                 #print("record", record.seq)
 
                 if (len(record.seq) < 15):
-                    return Response({'error': 'Protein sequence must be at least 15 amino acids long!'}, status=status.HTTP_400_BAD_REQUEST)
+                    invalid_responses.append({'error': 'Protein sequence must be at least 15 amino acids long!', 'ids': [record.id]})
+                    continue
 
                 
 
                 protein_ids, protein_seqs, k_positions = seqIOParser(record)
-                #print("Protein_ids: ", protein_ids, "\n")
-                #print("Protein_ids: ", protein_seqs, "\n")
-                #print("Protein_ids: ", k_positions, "\n")
                 idS.extend(protein_ids)
                 seqS.extend(protein_seqs)
                 positionS.extend(k_positions)
@@ -250,24 +263,33 @@ def fastaFile(request):
 
                 df = make_prediction(idS, seqS, positionS)  
 
-            except ValueError:
-                return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
-            except KeyError:
-                return Response({'error': 'Invalid protein sequence!'}, status=status.HTTP_400_BAD_REQUEST)
+            except (ValueError, KeyError) :
+                invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
+
+           
             
-            result_list = [
+            result_list = []
+            if idS:  # Proceed only if there are valid sequences to predict
+                    
+                result_list = [
                     {
                         "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
-                        "peptide_seq": protein_seq,
+                        "peptide_seq": peptide_seq,
                         "lysine_position": lysine_position,
                         "nonsumoylation_class_probs": nonsumoylation_class_probs,
                         "sumoylation_class_probs": sumoylation_class_probs,
                         "predicted_labels": predicted_labels
                     }
-                    for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels'])
+                    for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
+                        df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
+                    )
                 ]
-            return Response({"data": result_list, "length": len(result_list)}, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': 'Invalid file extension. Only fasta and txt files are allowed!'}, status=status.HTTP_400_BAD_REQUEST)
+        if  len(result_list) == 0 and  len(invalid_responses) == 0:  # If no valid data and no prior errors, assume all input was invalid
+            return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif len(result_list) == 0 and len(invalid_responses) > 0:
+            return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({"data": result_list, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
     else:
-        return Response({"error": "Please attach a file!"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'File must be in .fasta or .txt format!'}, status=status.HTTP_400_BAD_REQUEST)
