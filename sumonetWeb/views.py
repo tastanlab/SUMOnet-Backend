@@ -259,12 +259,12 @@ def fastaFile(request):
                 seqS.extend(protein_seqs)
                 positionS.extend(k_positions)
             
-            try:
+                try:
 
-                df = make_prediction(idS, seqS, positionS)  
+                    df = make_prediction(idS, seqS, positionS)  
 
-            except (ValueError, KeyError) :
-                invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
+                except (ValueError, KeyError) :
+                    invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
 
            
             
