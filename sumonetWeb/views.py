@@ -8,6 +8,9 @@ from io import StringIO
 from Bio import SeqIO
 from .helpers import make_prediction, seqIOParser
 import re
+import requests
+
+
 
 
 #! @desc: This function takes a uniprot id and lysine position as input 
@@ -39,20 +42,46 @@ def An_Uniprot_Id_Predictor(lysine_position, protein_seq, uniprot_id, threshold)
         return {'error': 'Invalid Lysine Position. Lysine Position must be positive!'}
     except TypeError:
         return {'error': 'No data found with this lysine position and Uniprot ID!'}
-
+    protein_names = []
+    protein_ids = []
     result = []
     for protein_id, protein_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']):
         if sumoylation_class_probs >= threshold:
+            if protein_id not in protein_ids:
+                try:
+                    response = requests.get(f'https://rest.uniprot.org/uniprotkb/{protein_id}?format=fasta')
+                    response.raise_for_status()
+                    fasta_data = response.text
+                    parts = fasta_data.split('|')
+                    #print("request send")
+
+                    if len(parts) > 2:
+                        third_part = parts[2]
+                        first_word = third_part.split(' ')[0]
+                        protein_ids.append(protein_id)
+                        protein_names.append(first_word)
+                    else:
+                        return Response({'error': 'UniProt API is giving an unexpected response!'},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                except requests.exceptions.HTTPError as e:
+                    invalid_responses.append({'error': str(e), 'id': protein_id})
+                    continue  # Skip processing this ID if an HTTP error occurred
+            index = protein_ids.index(uniprot_id)
+
             result.append({
                 "protein_id": uniprot_id,
+                "protein_name" : protein_names[index],
                 "peptide_seq": protein_seq,
                 "lysine_position": lysine_position,
                 "nonsumoylation_class_probs": nonsumoylation_class_probs,
                 "sumoylation_class_probs": sumoylation_class_probs,
-                "predicted_labels": predicted_labels
+                "predicted_labels": "Sumoylated" if predicted_labels == 1 else "Non-sumoylated"
             })
+            # Sorting the results by 'sumoylation_class_probs' in descending order
 
-    return result
+    result_sorted = sorted(result, key=lambda x: x['sumoylation_class_probs'], reverse=True)
+
+    return result_sorted
 
 
 
@@ -87,7 +116,7 @@ def uniprotPrediction(request):
                 invalid_uniprot_id_list = []
                 uniquness_list = []
                 uniprot_id_list = uniprot_id.replace(' ', '').split(",")
-                print(uniprot_id_list)
+                #print(uniprot_id_list)
                 for uid in uniprot_id_list:
                     if uid not in uniquness_list:
                         uniquness_list.append(uid)
@@ -112,7 +141,6 @@ def uniprotPrediction(request):
             
     else:
         protein_seq = data_processes.retrive_protein_sequence_with_uniprotid(uniprot_id)
-
         if protein_seq == '' or protein_seq == None:
             return Response({'error': 'No protein sequence found with this Uniprot ID!'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -182,21 +210,48 @@ def proteinSequence(request):
             invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
 
     result_list = []
+    protein_ids_checker = []
+    protein_names = []
     if idS:  # Proceed only if there are valid sequences to predict
-        
+
+        for protein_id in idS:
+            uniprot_id = protein_id.split('|')[1] if '|' in protein_id else protein_id
+            #print("Uniprot ID", uniprot_id)
+            if uniprot_id not in protein_ids_checker:
+                
+                try:
+                    response = requests.get(f'https://rest.uniprot.org/uniprotkb/{uniprot_id}?format=fasta')
+                    response.raise_for_status()
+                    fasta_data = response.text
+                    parts = fasta_data.split('|')
+                    #print("request send")
+
+                    if len(parts) > 2:
+                        third_part = parts[2]
+                        first_word = third_part.split(' ')[0]
+                        protein_ids_checker.append(uniprot_id)
+                        protein_names.append(first_word)
+                    else:
+                        return Response({'error': 'UniProt API is giving an unexpected response!'}, status=status.HTTP_400_BAD_REQUEST)
+                except requests.exceptions.HTTPError as e:
+                    invalid_responses.append({'error': str(e), 'id': uniprot_id})
+                    
         result_list = [
-            {
-                "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
-                "peptide_seq": peptide_seq,
-                "lysine_position": lysine_position,
-                "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                "sumoylation_class_probs": sumoylation_class_probs,
-                "predicted_labels": predicted_labels
-            }
-            for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
-                df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
-            )
-        ]
+                {
+                    "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
+                    "protein_name" : protein_names[protein_ids_checker.index(protein_id.split('|')[1] if '|' in protein_id else protein_id)],
+                    "peptide_seq": peptide_seq,
+                    "lysine_position": lysine_position,
+                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                    "sumoylation_class_probs": sumoylation_class_probs,
+                    "predicted_labels": "Sumoylated" if predicted_labels == 1 else "Non-sumoylated"
+                }
+                for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
+                    df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
+                )
+            ]
+
+    result_sorted = sorted(result_list, key=lambda x: x['sumoylation_class_probs'], reverse=True)
        
 
     if  len(result_list) == 0 and  len(invalid_responses) == 0:  # If no valid data and no prior errors, assume all input was invalid
@@ -207,7 +262,7 @@ def proteinSequence(request):
 
     # Always return a response including both results and any errors
     # response_status = status.HTTP_200_OK if result_list else status.HTTP_400_BAD_REQUEST
-    return Response({"data": result_list, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
+    return Response({"data": result_sorted, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
 
 
 
@@ -265,31 +320,54 @@ def fastaFile(request):
 
                 except (ValueError, KeyError) :
                     invalid_responses.append({'error': "Invalid Protein Sequence.", 'ids': record.id})
-
-           
-            
+            protein_ids_checker = []
+            protein_names = []
             result_list = []
-            if idS:  # Proceed only if there are valid sequences to predict
+            if idS:  # Proceed only if there are valid sequences to predict 
+                for protein_id in idS:
+                    uniprot_id = protein_id.split('|')[1] if '|' in protein_id else protein_id
+                    #print("Uniprot ID", uniprot_id)
+                    if uniprot_id not in protein_ids_checker:
+                        
+                        try:
+                            response = requests.get(f'https://rest.uniprot.org/uniprotkb/{uniprot_id}?format=fasta')
+                            response.raise_for_status()
+                            fasta_data = response.text
+                            parts = fasta_data.split('|')
+                            #print("request send")
+
+                            if len(parts) > 2:
+                                third_part = parts[2]
+                                first_word = third_part.split(' ')[0]
+                                protein_ids_checker.append(uniprot_id)
+                                protein_names.append(first_word)
+                            else:
+                                return Response({'error': 'UniProt API is giving an unexpected response!'}, status=status.HTTP_400_BAD_REQUEST)
+                        except requests.exceptions.HTTPError as e:
+                            invalid_responses.append({'error': str(e), 'id': uniprot_id})
                     
-                result_list = [
-                    {
-                        "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
-                        "peptide_seq": peptide_seq,
-                        "lysine_position": lysine_position,
-                        "nonsumoylation_class_probs": nonsumoylation_class_probs,
-                        "sumoylation_class_probs": sumoylation_class_probs,
-                        "predicted_labels": predicted_labels
-                    }
-                    for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
-                        df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
-                    )
-                ]
+            result_list = [
+                {
+                    "protein_id": protein_id.split('|')[1] if '|' in protein_id else protein_id,
+                    "protein_name" : protein_names[protein_ids_checker.index(protein_id.split('|')[1] if '|' in protein_id else protein_id)],
+                    "peptide_seq": peptide_seq,
+                    "lysine_position": lysine_position,
+                    "nonsumoylation_class_probs": nonsumoylation_class_probs,
+                    "sumoylation_class_probs": sumoylation_class_probs,
+                    "predicted_labels": "Sumoylated" if predicted_labels == 1 else "Non-sumoylated"
+                }
+                for protein_id, peptide_seq, lysine_position, nonsumoylation_class_probs, sumoylation_class_probs, predicted_labels in zip(
+                    df['protein_id'], df['protein_seq'], df['lysine_position'], df['nonsumoylation_class_probs'], df['sumoylation_class_probs'], df['predicted_labels']
+                )
+            ]
+
+        result_sorted = sorted(result_list, key=lambda x: x['sumoylation_class_probs'], reverse=True)
         if  len(result_list) == 0 and  len(invalid_responses) == 0:  # If no valid data and no prior errors, assume all input was invalid
             return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         elif len(result_list) == 0 and len(invalid_responses) > 0:
             return Response({"error": "No valid protein sequences provided."}, status=status.HTTP_400_BAD_REQUEST)
         
-        return Response({"data": result_list, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
+        return Response({"data": result_sorted, "length": len(result_list), "errors": invalid_responses}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'File must be in .fasta or .txt format!'}, status=status.HTTP_400_BAD_REQUEST)
